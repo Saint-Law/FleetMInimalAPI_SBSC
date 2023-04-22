@@ -8,5 +8,6 @@
         public string DriverName { get; set; }
         public string Car { get; set; }
         public double LogisticFee { get; set; }
+        public DateTime Departure { get; set; } 
     }
 }

@@ -176,6 +176,73 @@ namespace FleetApi
             });
 
 
+            //Get all records from the database
+            app.MapGet("/trip", async (FleetDbContext db) =>
+                await db.Trips.ToListAsync()
+
+            );
+
+            //Get specific records from the database
+            app.MapGet("/trip/{id}", async (int id, FleetDbContext db) =>
+                 await db.Trips.FindAsync(id)
+                     is Trip trips 
+                     ? Results.Ok(trips)
+                     : Results.NotFound()
+            );
+
+
+            //Modify specific records from the database
+            app.MapPut("/trip/{id}", async (int id, Trip trips, FleetDbContext db) =>
+            {
+                var record = await db.Trips.FindAsync(id);
+                if (record == null)
+                {
+                    return Results.NotFound();
+                }
+
+                record.From = trips.From;
+                record.To = trips.To;
+                record.DriverName = trips.DriverName;
+                record.Car = trips.Car;
+                record.LogisticFee = trips.LogisticFee;
+                record.Departure = trips.Departure;
+                
+
+                await db.SaveChangesAsync();
+
+                return Results.NoContent();
+
+            });
+
+            //Create new records into the database
+            app.MapPost("/trip", async (Trip trips, FleetDbContext db) =>
+            {
+                db.Add(trips);
+
+                await db.SaveChangesAsync();
+
+                return Results.Created($"/trip", trips);
+
+            });
+
+            //Delete specific records from the database
+            app.MapDelete("/trip/{id}", async (int id, FleetDbContext db) =>
+            {
+                var record = await db.Trips.FindAsync(id);
+                if (record == null)
+                {
+                    return Results.NotFound();
+                }
+
+                db.Remove(record);
+
+                await db.SaveChangesAsync();
+
+                return Results.NoContent();
+
+            });
+
+
             app.Run();
         }
     }
