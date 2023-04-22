@@ -1,3 +1,8 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using System.Data;
+
 namespace FleetApi
 {
     public class Program
@@ -13,6 +18,17 @@ namespace FleetApi
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
+            //Adding cors for the purpose of comsumption by other clients
+            //who are not necessarilly be on the same server with this project.
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", a => a.AllowAnyHeader().AllowAnyOrigin().AllowAnyMethod());
+            });
+
+            //configuring and setting up the database path
+            builder.Services.AddDbContext<FleetDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+            builder.Services.AddTransient<IDbConnection>(prov => new SqlConnection(prov.GetService<IConfiguration>().GetConnectionString("DefaultConnection")));
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -24,26 +40,141 @@ namespace FleetApi
 
             app.UseHttpsRedirection();
 
+            app.UseCors("AllowAll");
+
             app.UseAuthorization();
 
-            var summaries = new[]
-            {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
 
-            app.MapGet("/weatherforecast", (HttpContext httpContext) =>
+            //Get all records from the database
+            app.MapGet("/driver", async (FleetDbContext db) =>                
+                await db.Drivers.ToListAsync()               
+
+            );
+
+            //Get specific records from the database
+           app.MapGet("/driver/{id}", async (int id, FleetDbContext db) =>
+                await db.Drivers.FindAsync(id)
+                    is Driver drivers
+                    ? Results.Ok(drivers)
+                    : Results.NotFound()
+
+            );
+
+            //Modify specific records from the database
+            app.MapPut("/driver/{id}", async (int id, Driver drivers, FleetDbContext db) =>
+              {
+                  var record = await db.Drivers.FindAsync(id);
+                  if(record == null)
+                  {
+                      return Results.NotFound();
+                  }
+
+                  record.Name = drivers.Name;
+                  record.Gender = drivers.Gender;
+                  record.Address = drivers.Address;
+                  record.Contact = drivers.Contact;
+                  record.Rank = drivers.Rank;
+                  record.LicenseNo = drivers.LicenseNo;
+
+
+                  await db.SaveChangesAsync();
+
+                  return Results.NoContent();
+
+              });
+
+            //Modify specific records from the database
+            app.MapPost("/driver", async (Driver drivers, FleetDbContext db) =>
             {
-                var forecast = Enumerable.Range(1, 5).Select(index =>
-                    new WeatherForecast
-                    {
-                        Date = DateTime.Now.AddDays(index),
-                        TemperatureC = Random.Shared.Next(-20, 55),
-                        Summary = summaries[Random.Shared.Next(summaries.Length)]
-                    })
-                    .ToArray();
-                return forecast;
-            })
-            .WithName("GetWeatherForecast");
+                db.Add(drivers);
+
+                await db.SaveChangesAsync();
+
+                return Results.Created($"/driver", drivers);
+
+            });
+
+            //Delete specific records from the database
+            app.MapDelete("/driver/{id}", async (int id, FleetDbContext db) =>
+            {
+                var record = await db.Drivers.FindAsync(id);
+                if (record == null)
+                {
+                    return Results.NotFound();
+                }
+
+                db.Remove(record);
+
+                await db.SaveChangesAsync();
+
+                return Results.NoContent();
+
+            });
+
+
+            //Get all records from the database
+            app.MapGet("/car", async (FleetDbContext db) =>
+                await db.Cars.ToListAsync()
+
+            );
+
+            //Get specific records from the database
+            app.MapGet("/car/{id}", async (int id, FleetDbContext db) =>
+                 await db.Cars.FindAsync(id)
+                     is Car cars
+                     ? Results.Ok(cars)
+                     : Results.NotFound()
+            );
+
+
+            //Modify specific records from the database
+            app.MapPut("/car/{id}", async (int id, Car cars, FleetDbContext db) =>
+            {
+                var record = await db.Cars.FindAsync(id);
+                if (record == null)
+                {
+                    return Results.NotFound();
+                }
+
+                record.Brand = cars.Brand;
+                record.Model = cars.Model;
+                record.EngineNumber = cars.EngineNumber;
+                record.Status = cars.Status;
+                
+                await db.SaveChangesAsync();
+
+                return Results.NoContent();
+
+            });
+
+            //Modify specific records from the database
+            app.MapPost("/car", async (Car cars, FleetDbContext db) =>
+            {
+                db.Add(cars);
+
+                await db.SaveChangesAsync();
+
+                return Results.Created($"/car", cars);
+
+            });
+
+            //Delete specific records from the database
+            app.MapDelete("/car/{id}", async (int id, FleetDbContext db) =>
+            {
+                var record = await db.Cars.FindAsync(id);
+                if (record == null)
+                {
+                    return Results.NotFound();
+                }
+
+                db.Remove(record);
+
+                await db.SaveChangesAsync();
+
+                return Results.NoContent();
+
+            });
+
 
             app.Run();
         }
